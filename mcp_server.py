@@ -8,63 +8,72 @@ DF: Optional[pd.DataFrame] = None
 
 # MCP 서버 초기화
 mcp = FastMCP(
-    "MerchantSearchServer",
+    "ZCD_BZN_SearchServer",
     instructions="""
-    신한카드 가맹점을 검색하는 서비스입니다.
+    사용자의 업종과 상권을 바탕으로 마케팅 아이디어를 생성하는 서비스입니다.
     
-    사용자가 가맹점명을 입력하면 search_merchant 함수를 사용하여 해당 가맹점의 상세 정보를 검색합니다.
-    가맹점명은 부분 일치로 검색되며, 대소문자를 구분하지 않습니다.
+    사용자가 업종과 상권을 입력하면 search_ZCD_BZN 함수를 사용하여 
+    해당 상권에 속해 있고 그 상권에서 사용자와 같은 업종을 운영하고 있는 타 가맹점의 현 상태를
+    분석해서 해당 상권의 주요 고객층과 고객 유형을 보여줍니다.
+   
+    업종과 상권은 부분일치를 허용합니다.
     
     검색 결과에는 다음 정보가 포함됩니다:
-    - 가맹점명, 업종, 주소, 개설일자
-    - 이용건수구간, 이용금액구간
-    - 현지인 이용 비중, 영업시간
-    - 상세 정보
+        - 해당 상권의 주요 고객층
+        - 그 상권에 속하는 업종의 주요 고객층
+        - 그 상권에 속하는 업종의 고객 유형 비중
     """
 )
 
 # 데이터 로드 함수
 def _load_df():
     global DF
-    DF = pd.read_csv("./data/mct_sample.csv")
+    DF = pd.read_csv("./data/df_join_open_stores_drop_grouped.csv")
     return DF
 
 # 서버 시작 시 데이터 로드
 _load_df()
 
 @mcp.tool()
-def search_merchant(merchant_name: str) -> Dict[str, Any]:
+def search_ZCD_BZN(BZN : str, ZCD : str) -> Dict[str, Any]:
     """
-    가맹점명을 입력받아 해당 가맹점 정보를 검색합니다.
+    상권과 업종을 입력받아 해당 가맹점 정보를 검색합니다.
     
     매개변수:
-      - merchant_name: 검색할 가맹점명 (부분 일치 지원)
+      - BZN : 검색할 상권
+      - ZCD : 검색할 업종
     
     반환값:
-      - 가맹점 정보가 담긴 딕셔너리
+      -  해당 상권에 속해 있고 그 상권에서 사용자와 같은 업종을 운영하고 있는 타 가맹점의 현 상황
     """
-    assert DF is not None, "DataFrame이 초기화되지 않았습니다."
+    try:
     
-    # 가맹점명으로 검색 (exact match)
-    result = DF[DF['가맹점명'].astype(str).str.replace('*', '') == merchant_name.replace('*', '')]
+        result = DF[(DF["상권"] == BZN) & (DF["업종"] == ZCD)]
     
-    if len(result) == 0:
-        return {
-            "found": False,
-            "message": f"'{merchant_name}'에 해당하는 가맹점을 찾을 수 없습니다.",
-            "count": 0,
-            "merchants": []
-        }
+        if len(result) == 0:
+            return {
+                "found": False,
+                "message": f"'{BZN}' 상권에서 '{ZCD}' 업종에 해당하는 영업 중인 가맹점을 찾을 수 없습니다.",
+                "count": 0,
+                "stores": []
+         }
     
     # 결과를 딕셔너리로 변환
-    merchants = result.to_dict(orient='records')
+        stores = result.to_dict(orient='records')
 
-    return {
-        "found": True,
-        "message": f"'{merchant_name}'에 해당하는 가맹점 {len(merchants)}개를 찾았습니다.",
-        "count": len(merchants),
-        "merchants": merchants
-    }
+        return {
+            "found": True,
+            "message": f"'{BZN}' 상권의 '{ZCD}' 업종에 해당하는 영업 중인 가맹점 {len(stores)}개를 찾았습니다.",
+            "count": len(stores),
+            "stores": stores
+        }
+    except Exception as e:
+        print(f"!!!!!! Tool 함수 내부에서 심각한 오류 발생: {e} !!!!!!")
+        return {
+            "found": False,
+            "message": f"데이터 검색 중 내부 오류가 발생했습니다: {e}",
+            "stores": []
+        }
 
 if __name__ == "__main__":
     mcp.run()
