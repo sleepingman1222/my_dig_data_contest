@@ -47,7 +47,14 @@ def search_ZCD_BZN(BZN : str, ZCD : str) -> Dict[str, Any]:
       -  해당 상권에 속해 있고 그 상권에서 사용자와 같은 업종을 운영하고 있는 타 가맹점의 현 상황
     """
     try:
-    
+        BZN_list = DF["상권"].unique()
+        ZCD_list = DF["업종"].unique()
+        for val in BZN_list:
+            if val in BZN:
+                BZN = val
+        for val in ZCD_list:
+            if val in ZCD:
+                ZCD = val
         result = DF[(DF["상권"] == BZN) & (DF["업종"] == ZCD)]
     
         if len(result) == 0:
